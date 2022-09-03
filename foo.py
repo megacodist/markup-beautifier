@@ -19,5 +19,19 @@ async def main_Thrd():
     pprint(await main_USD())
 
 
+def Beautify(html: str) -> list[str]:
+    from lxml import etree
+
+    htmlParser = etree.HTMLParser()
+    dom: etree.ElementBase = etree.fromstring(html, htmlParser)
+    html: bytes = etree.tostring(dom, pretty_print=True)
+    html: str = html.decode()
+    htmlLines = html.splitlines(keepends=False)
+    return [
+        line
+        for line in htmlLines
+        if line.strip()]
+
+
 if __name__ == '__main__':
     asyncio.run(main_Thrd())

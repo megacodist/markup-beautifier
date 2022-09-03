@@ -9,7 +9,7 @@ from tkinter.scrolledtext import ScrolledText
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlparse, urlunparse
 
-from dialogs import OutlineDialog
+from dialogs import BeautifyingDialog, OutlineDialog
 from megacodist.html import HtmlTagsChecker, HtmlTagsOutliner
 
 
@@ -239,22 +239,46 @@ class BeautifierWindow(tk.Tk):
             self.btn_go['state'] = tk.NORMAL
 
     def _CheckTags(self) -> None:
+        import warnings
+        from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
         # Variables...
         result: bool
+        html: str
 
+        # Registering XMLParsedAsHTMLWarning as exception...
+        warnings.filterwarnings(action='error',category=XMLParsedAsHTMLWarning)
+        # Getting the HTML...
+        html = self.scrldtxt_tags.get('1.0', 'end')
+        # Checking tags consistency...
         htmlChecker = HtmlTagsChecker()
-        result = htmlChecker.feed(self.scrldtxt_tags.get('1.0', 'end'))
+        result = htmlChecker.feed(html)
         if result:
             # Tags are Ok, chaning the background to green...
             self.scrldtxt_tags['background'] = '#98FFD3'
         else:
             # Tags are NOT Ok, chaning the background to pink...
             self.scrldtxt_tags['background'] = '#FFC6DF'
+        # Beatifying the HTML...
+        bDialog = BeautifyingDialog(html)
+        bDialog.mainloop()
+        '''try:
+            bsoup = BeautifulSoup(html, features='lxml')
+        except XMLParsedAsHTMLWarning:
+            bsoup = BeautifulSoup(html, features='lxml-xml')
+        oDialog = OutlineDialog(text=Prettify(bsoup.prettify()))
+        oDialog.mainloop()'''
 
-        outliner = HtmlTagsOutliner()
-        result = outliner.feed(self.scrldtxt_tags.get('1.0', 'end'))
-        oDialog = OutlineDialog(text=result)
-        oDialog.mainloop()
+
+def Prettify(text: str) -> str:
+    indent = 2
+    lines = text.splitlines(keepends=False)
+    idx = 0
+    while idx < len(lines):
+        lspaces = len(lines[idx]) - len(lines[idx].lstrip())
+        lines[idx] = (' ' * ((indent - 1) * lspaces)) + lines[idx]
+        idx += 1
+    return '\n'.join(lines)
 
 
 if __name__ == '__main__':
