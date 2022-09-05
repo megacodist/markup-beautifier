@@ -9,8 +9,9 @@ from tkinter.scrolledtext import ScrolledText
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlparse, urlunparse
 
-from dialogs import BeautifyingDialog, OutlineDialog
-from megacodist.html import HtmlTagsChecker, HtmlTagsOutliner
+from megacodist.html import HtmlTagsChecker
+
+from dialogs import BeautifyingDialog
 
 
 class AsyncRequest(Thread):
@@ -31,8 +32,21 @@ class AsyncRequest(Thread):
         self.htmlResponse = None
 
     def run(self) -> None:
+        import platform
         try:
-            self.htmlResponse = requests.get(self.url).text
+            pltfrm = platform.system_alias(
+                platform.system(),
+                platform.release(),
+                platform.version())
+            headers = {
+                'User-Agent': (
+                    'Mozilla/5.0, '
+                    + f'({pltfrm}) '
+                    + '(compatible; markup-beautifier; +https://github.com/megacodist/markup-beautifier)')}
+            self.htmlResponse = requests.get(
+                self.url,
+                headers=headers,
+                ).text
         except Exception as err:
             self.htmlResponse = str(err)
 
@@ -47,7 +61,7 @@ class BeautifierWindow(tk.Tk):
 
     def __init__(self) -> None:
         super().__init__()
-        self.title('HTML Beatifier')
+        self.title('Markup Beatifier')
 
         # Creating address bar frame...
         self.frm_addressbar = ttk.Frame(self)
@@ -260,14 +274,8 @@ class BeautifierWindow(tk.Tk):
             # Tags are NOT Ok, chaning the background to pink...
             self.scrldtxt_tags['background'] = '#FFC6DF'
         # Beatifying the HTML...
-        bDialog = BeautifyingDialog(html)
+        bDialog = BeautifyingDialog(html, indent=3)
         bDialog.mainloop()
-        '''try:
-            bsoup = BeautifulSoup(html, features='lxml')
-        except XMLParsedAsHTMLWarning:
-            bsoup = BeautifulSoup(html, features='lxml-xml')
-        oDialog = OutlineDialog(text=Prettify(bsoup.prettify()))
-        oDialog.mainloop()'''
 
 
 def Prettify(text: str) -> str:

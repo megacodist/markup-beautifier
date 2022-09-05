@@ -1,10 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
-import  warnings
-#from xml.etree.ElementTree import tostring
 
 from lxml import etree
-from lxml.etree import HTMLParser, _ElementTree, _Element
+from lxml.etree import _ElementTree, _Element, _Comment
+from megacodist.html import SINGLETON_ELEMS
 
 
 class BeautifyingDialog(tk.Toplevel):
@@ -72,10 +71,6 @@ class BeautifyingDialog(tk.Toplevel):
             row=1,
             sticky=tk.NSEW)
     
-    def _Prettify_mmm(self) -> None:
-        self._txt.delete('1.0', 'end')
-        self._txt.insert('1.0', etree.tostring(self._dom, pretty_print=True))
-    
     def _Prettify(self) -> None:
         result: list[str] = [self._dom.docinfo.doctype,]
         result += self._Prettify_recur(self._dom.getroot(), 0)
@@ -88,38 +83,67 @@ class BeautifyingDialog(tk.Toplevel):
             elem: _Element,
             level: int
             ) -> list[str]:
-        from megacodist.html import SINGLETON_ELEMS
+        leadingSpace = ' ' * (level * self._indent)
+        # Processing lxml.etree._Comment objects...
+        if isinstance(elem, _Comment):
+            comment = str(elem)
+            comment = [
+                leadingSpace + content
+                for line in comment.splitlines()
+                if (content := line.strip())]
+            return comment
+        # Processing lxml.etree._Element objects...
+        # Beautifying children...
         children: list[str] = []
         for child in elem:
             children += self._Prettify_recur(child, level + 1)
-        leadingSpace = ' ' * (level * self._indent)
+        # Beautifying start tag & attributes...
         attrs = ' '.join([
-            f'{attr}="{value}"'
+            f'''{attr}="{' '.join(value.split())}"'''
             for attr, value in elem.attrib.items()])
         startTag = elem.tag
         if attrs:
             startTag += (' ' + attrs)
+        # Beautifying text...
         text = None
         if elem.text:
-            text = elem.text.strip()
+            text: list[str] = [
+                content
+                for line in elem.text.splitlines()
+                if (content := line.strip())]
+        # Beautifying tail...
         tail = None
         if elem.tail:
-            tail = elem.tail.strip()
+            tail: list[str] = [
+                leadingSpace + (' ' * self._indent) + content
+                for line in elem.tail.splitlines()
+                if (content := line.strip())]
         # Forming the result...
-        if children:
-            children.insert(0, leadingSpace + f'<{startTag}>')
+        if children or (text and (len(text) > 1)):
+            # Appending text...
             if text:
-                children.insert(1, leadingSpace + (' ' * self._indent) + text)
+                text = [
+                    leadingSpace + (' ' * self._indent) + line
+                    for line in text]
+                children = text + children
+            # Appending start tag...
+            children.insert(0, leadingSpace + f'<{startTag}>')
+            # Appending tail...
             if tail:
-                children.append(leadingSpace + (' ' * self._indent) + text)
+                children += tail
+            # Appending end tag...
             children.append(leadingSpace + f'</{elem.tag}>')
         elif text:
-            children.insert(0, leadingSpace + f'<{startTag}>{text}</{elem.tag}>')
+            children.insert(
+                0,
+                leadingSpace + f'<{startTag}>{text[0]}</{elem.tag}>')
         else:
             if elem.tag in SINGLETON_ELEMS:
                 children.insert(0, leadingSpace + f'<{startTag} />')
             else:
-                children.insert(0, leadingSpace + f'<{startTag}></{elem.tag}>')
+                children.insert(
+                    0,
+                    leadingSpace + f'<{startTag}></{elem.tag}>')
         return children
 
 
@@ -134,7 +158,7 @@ class OutlineDialog(tk.Toplevel):
         super().__init__(master, **kwargs)
         self.title('The outline of HTML elements')
 
-        self._dom:_ElementTree = fromstring(text)
+        self._dom:_ElementTree = etree.fromstring(text)
 
         #
         self._frm_container = ttk.Frame(self)
